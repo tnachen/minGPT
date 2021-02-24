@@ -1,40 +1,16 @@
 import math
 import os
-import time
+from argparse import ArgumentParser
 
 import numpy as np
 import torch
-from pytorch_lightning import Trainer, Callback
+from pytorch_lightning import Trainer
 from pytorch_lightning import seed_everything
 from torch.utils.data import Dataset, DataLoader
 
+from mingpt.callback import CUDACallback
 from mingpt.lr_decay import LearningRateDecayCallback
 from mingpt.model import GPT
-
-
-class CUDACallback(Callback):
-
-    def on_train_epoch_start(self, trainer, pl_module):
-        # Reset the memory use counter
-        torch.cuda.reset_peak_memory_stats(trainer.root_gpu)
-        torch.cuda.synchronize(trainer.root_gpu)
-        self.start_time = time.time()
-
-    def on_train_epoch_end(self, trainer, pl_module, outputs):
-        torch.cuda.synchronize(trainer.root_gpu)
-        max_memory = torch.cuda.max_memory_allocated(trainer.root_gpu) / 2 ** 20
-        epoch_time = time.time() - self.start_time
-
-        max_memory = torch.tensor(int(max_memory), dtype=torch.int, device=trainer.root_gpu)
-        epoch_time = torch.tensor(int(epoch_time), dtype=torch.int, device=trainer.root_gpu)
-
-        torch.distributed.all_reduce(max_memory, op=torch.distributed.ReduceOp.SUM)
-        torch.distributed.all_reduce(epoch_time, op=torch.distributed.ReduceOp.SUM)
-
-        world_size = torch.distributed.get_world_size()
-
-        print(f"Average Epoch time: {epoch_time.item() / float(world_size):.2f} seconds")
-        print(f"Average Peak memory {max_memory.item() / float(world_size):.2f}MiB")
 
 
 class CharDataset(Dataset):
@@ -65,36 +41,43 @@ class CharDataset(Dataset):
 
 if __name__ == '__main__':
     seed_everything(42)
-    block_size = 128  # spatial extent of the model for its context
+
+    parser = ArgumentParser()
+    parser = Trainer.add_argparse_args(parser)
+    parser.add_argument('--n_layer', default=22, type=int)
+    parser.add_argument('--n_head', default=16, type=int)
+    parser.add_argument('--n_embd', default=3072, type=int)
+    parser.add_argument('--learning_rate', default=6e-4, type=float)
+    parser.add_argument('--block_size', default=128, type=int)
+    parser.add_argument('--batch_size', default=8, type=int)
+    parser.add_argument('--num_workers', default=4, type=int)
+    args = parser.parse_args()
 
     if not os.path.exists("input.txt"):
         os.system("wget https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt")
 
     # you can download this file at https://github.com/karpathy/char-rnn/blob/master/data/tinyshakespeare/input.txt
     text = open('input.txt', 'r').read()  # don't worry we won't run out of file handles
-    train_dataset = CharDataset(text, block_size)  # one line of poem is roughly 50 characters
-    train_loader = DataLoader(train_dataset, batch_size=8, num_workers=4)
+    train_dataset = CharDataset(text, args.block_size)  # one line of poem is roughly 50 characters
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=args.num_workers)
 
     model = GPT(
         vocab_size=train_dataset.vocab_size,
         block_size=train_dataset.block_size,
-        n_layer=15,
-        n_head=16,
-        n_embd=3072,
-        learning_rate=6e-4
+        n_layer=args.n_layer,
+        n_head=args.n_head,
+        n_embd=args.n_embd,
+        learning_rate=args.learning_rate
     )
 
-    # scheduler
     lr_decay = LearningRateDecayCallback(
         learning_rate=6e-4,
         warmup_tokens=512 * 20,
-        final_tokens=00 * len(train_dataset) * block_size
+        final_tokens=2 * len(train_dataset) * args.block_size
     )
 
-    trainer = Trainer(
-        gpus=4,
-        precision=16,
-        accelerator='ddp',
+    trainer = Trainer.from_argparse_args(
+        args,
         max_epochs=1,
         gradient_clip_val=1.0,
         callbacks=[lr_decay, CUDACallback()],

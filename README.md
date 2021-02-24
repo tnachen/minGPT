@@ -1,61 +1,91 @@
-
-# minGPT
+# minGPT Lightning Benchmark
 
 ![mingpt](mingpt.jpg)
 
-A PyTorch re-implementation of [GPT](https://github.com/openai/gpt-3) training. minGPT tries to be small, clean, interpretable and educational, as most of the currently available ones are a bit sprawling. GPT is not a complicated model and this implementation is appropriately about 300 lines of code, including boilerplate and a totally unnecessary custom causal self-attention module. Anyway, all that's going on is that a sequence of indices goes into a sequence of transformer blocks, and a probability distribution of the next index comes out. The rest of the complexity is just being clever with batching (both across examples and over sequence length) so that training is efficient.
+Modified [Andrej's](https://github.com/karpathy/minGPT) and [William's](https://github.com/williamFalcon/minGPT) awesome code to create a simple benchmarking script.
 
-The core minGPT "library" (hah) is two files: `mingpt/model.py` contains the actual Transformer model definition and `mingpt/trainer.py` is (GPT-independent) PyTorch boilerplate that trains the model. The attached Jupyter notebooks then show how the "library" (hah) can be used to train sequence models:
+### Usage
 
-- `play_math.ipynb` trains a GPT focused on addition (inspired by the addition section in the GPT-3 paper)
-- `play_char.ipynb` trains a GPT to be a character-level language model on arbitrary text, similar to my older char-rnn but with a transformer instead of an RNN
-- `play_words.ipynb` a BPE version that does not yet exist
+```
+pip install -r requirements.txt
+```
 
-With a bpe encoder, distributed training and maybe fp16 this implementation may be able to reproduce GPT-1/GPT-2 results, though I haven't tried $$$. GPT-3 is likely out of reach as my understanding is that it does not fit into GPU memory and requires a more careful model-parallel treatment.
+We benchmark a few different models with different configurations. Below is an example of some of the configurations we can run:
 
-### Example usage
+```bash
+# 1.6B parameters
+python benchmark.py --n_layer 14 --n_head 16 --n_embd 3072 --gpus 8 --precision 16 --accelerator ddp --limit_train_batches 120
+```
 
-This code is simple enough to just hack inline, not "used", but current API looks something like:
+```bash
+# 2.5B parameters
+python benchmark.py --n_layer 22 --n_head 16 --n_embd 3072 --gpus 8 --plugins deepspeed --precision 16 --limit_train_batches 120
+```
+
+```bash
+# 13B parameters, only possible with DeepSpeed
+python benchmark.py --n_layer 16 --n_head 16 --n_embd 8192 --gpus 8 --plugins deepspeed --precision 16 --limit_train_batches 120
+```
+
+### Results
+
+Results were collected on an 8 GPU A100 server.
+
+#### DDP vs DeepSpeed
+
+The first set of results we collected were using a model size that fit training with DDP (roughly 1.6B parameters). 
+When using DeepSpeed, I noticed that for the first 20 batches the optimizer step was skipped as infs were detected.
+
+Command:
+```bash
+1.6B
+python benchmark.py --n_layer 14 --n_head 16 --n_embd 3072 --gpus 8 --accelerator ddp --precision 16 --limit_train_batches 120
+```
+
+```
+DDP
+INFO:lightning:Average Epoch time: 40.27 seconds
+Average Peak memory 35834.96MiB
+
+DeepSpeed Default (With ZeRO-Offload)
+INFO:lightning:Average Epoch time: 357.26 seconds
+Average Peak memory 9993.60MiB
+
+DeepSpeed With ZeRO, no Offload
+INFO:lightning:Average Epoch time: 18.41 seconds
+Average Peak memory 12625.53MiB
+
+DeepSpeed Without ZeRO-Offload (requires instantiating the plugin, example below)
+Average Epoch time: 33.27 seconds
+Average Peak memory 30698.40MiB
+
+```
+
+#### Maximum DeepSpeed!
+
+My attempt to get the fit the largest model I could train on this machine reasonably:
+
+```
+python benchmark.py --n_layer 16 --n_head 16 --n_embd 8192 --gpus 8 --plugins deepspeed --precision 16 --limit_train_batches 120
+
+Coming soon...
+```
+
+#### Instantiating DeepSpeed
+
+When modifying defaults, we have to specify the ``DeepSpeedPlugin`` as input, so I made the modification as such to the benchmark script and adjusted parameters when necessary:
 
 ```python
+from pytorch_lightning.plugins import DeepSpeedPlugin
 
-# you're on your own to define a class that returns individual examples as PyTorch LongTensors
-from torch.utils.data import Dataset, DataLoader
-train_dataset = MyDataset(...)
-val_dataset = MyDataset(...)
-train_loader = DataLoader(train_dataset)
-val_loader = DataLoader(val_dataset)
-
-# construct a GPT model
-from mingpt.model import GPT
-model = GPT(vocab_size=train_dataset.vocab_size, 
-            block_size=train_dataset.block_size,
-            n_layer=8, 
-            n_head=8, 
-            n_embd=512, 
-            learning_rate=6e-4)
-
-# construct a trainer
-from pytorch_lightning import Trainer
-from mingpt.lr_decay import LearningRateDecayCallback
-
-# scheduler
-lr_decay = LearningRateDecayCallback(learning_rate=6e-4, warmup_tokens=512*20,
-                                    final_tokens=00*len(train_dataset)*block_size)
-
-trainer = Trainer(gpus=1, precision=16, max_epochs=500,
-                  gradient_clip_val=1.0, 
-                  callbacks=[lr_decay], 
-                  progress_bar_refresh_rate=1, 
-                  row_log_interval=1)
-trainer.fit(model, train_loader, val_loader)
-# (... enjoy the show for a while... )
-
-# sample from the model (the [None, ...] and [0] are to push/pop a needed dummy batch dimension)
-from mingpt.utils import sample
-x = torch.tensor([1, 2, 3], dtype=torch.long)[None, ...] # context conditioning
-y = sample(model, x, steps=30, temperature=1.0, sample=True, top_k=5)[0]
-print(y) # our model filled in the integer sequence with 30 additional likely integers
+...
+trainer = Trainer.from_argparse_args(
+    args,
+    max_epochs=1,
+    gradient_clip_val=1.0,
+    plugins=[DeepSpeedPlugin(zero_optimization=False)], # Pass in my own custom deepspeed plugin to turn off ZeRO-Offload
+    callbacks=[lr_decay, CUDACallback()],
+)
 ```
 
 ### References
