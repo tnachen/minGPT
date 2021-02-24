@@ -42,23 +42,25 @@ Command:
 python benchmark.py --n_layer 14 --n_head 16 --n_embd 3072 --gpus 8 --accelerator ddp --precision 16 --limit_train_batches 120
 ```
 
+##### DDP
 ```
-DDP
-INFO:lightning:Average Epoch time: 40.27 seconds
+Average Epoch time: 40.27 seconds
 Average Peak memory 35834.96MiB
-
-DeepSpeed Default (With ZeRO-Offload)
-INFO:lightning:Average Epoch time: 357.26 seconds
+```
+##### DeepSpeed Default (With ZeRO-Offload)
+```
+Average Epoch time: 357.26 seconds
 Average Peak memory 9993.60MiB
-
-DeepSpeed With ZeRO, no Offload
-INFO:lightning:Average Epoch time: 18.41 seconds
+```
+##### DeepSpeed With ZeRO, no Offload
+```
+Average Epoch time: 18.41 seconds
 Average Peak memory 12625.53MiB
-
-DeepSpeed Without ZeRO-Offload (requires instantiating the plugin, example below)
+```
+##### DeepSpeed Without ZeRO-Offload (requires instantiating the plugin, example below)
+```
 Average Epoch time: 33.27 seconds
 Average Peak memory 30698.40MiB
-
 ```
 
 #### Maximum DeepSpeed!
