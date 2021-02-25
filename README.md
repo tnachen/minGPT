@@ -68,9 +68,11 @@ Average Peak memory 30698.40MiB
 My attempt to get the fit the largest model I could train on this machine reasonably:
 
 ```
+12.9B
 python benchmark.py --n_layer 16 --n_head 16 --n_embd 8192 --gpus 8 --plugins deepspeed --precision 16 --limit_train_batches 120
 
-Coming soon...
+Average Epoch time: 1700.02 seconds
+Average Peak memory 35430.12MiB
 ```
 
 #### Instantiating DeepSpeed
