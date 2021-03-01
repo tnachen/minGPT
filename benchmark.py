@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning import seed_everything
+from pytorch_lightning.utilities import rank_zero_info
 from torch.utils.data import Dataset, DataLoader
 
 from mingpt.callback import CUDACallback
@@ -18,7 +19,7 @@ class CharDataset(Dataset):
     def __init__(self, data, block_size):
         chars = list(set(data))
         data_size, vocab_size = len(data), len(chars)
-        print('data has %d characters, %d unique.' % (data_size, vocab_size))
+        rank_zero_info('data has %d characters, %d unique.' % (data_size, vocab_size))
 
         self.stoi = {ch: i for i, ch in enumerate(chars)}
         self.itos = {i: ch for i, ch in enumerate(chars)}
