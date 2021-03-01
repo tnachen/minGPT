@@ -81,7 +81,7 @@ if __name__ == '__main__':
         args,
         max_epochs=1,
         gradient_clip_val=1.0,
-        plugins='fully_sharded',
+        plugins='ddp_fully_sharded',
         checkpoint_callback=False,
         callbacks=[lr_decay, CUDACallback()],
     )
