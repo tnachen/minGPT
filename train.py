@@ -1,11 +1,9 @@
-import logging
 import math
 import os
 from argparse import ArgumentParser
 
 import numpy as np
 import torch
-
 from pytorch_lightning import Trainer
 from pytorch_lightning import seed_everything
 from pytorch_lightning.plugins import DeepSpeedPlugin
@@ -53,9 +51,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_embd', default=3072, type=int)
     parser.add_argument('--learning_rate', default=6e-4, type=float)
     parser.add_argument('--block_size', default=128, type=int)
-    parser.add_argument('--batch_size', default=4, type=int)
+    parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--num_workers', default=0, type=int)
-    parser.add_argument('--cpu_offload', action='store_true')
     args = parser.parse_args()
 
     if not os.path.exists("input.txt"):
@@ -83,16 +80,12 @@ if __name__ == '__main__':
 
     trainer = Trainer.from_argparse_args(
         args,
-        max_epochs=1,
+        max_epochs=10,
         gradient_clip_val=1.0,
         plugins=DeepSpeedPlugin(
             stage=3,
-            offload_optimizer=True,
-            offload_parameters=True,
-            partition_activations=True,
-            logging_level=logging.INFO
+            cpu_offload=True
         ),
-        checkpoint_callback=False,
         callbacks=[lr_decay, CUDACallback()],
     )
     trainer.fit(model, train_loader)

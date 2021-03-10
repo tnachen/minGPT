@@ -1,1 +1,2 @@
-pytorch-lightning>=1.2.1
+git+https://github.com/PyTorchLightning/pytorch-lightning.git
+deepspeed
