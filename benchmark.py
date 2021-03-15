@@ -12,6 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from mingpt.callback import CUDACallback
 from mingpt.lr_decay import LearningRateDecayCallback
 from mingpt.model import GPT
+from pytorch_lightning.plugins.training_type import DeepSpeedPlugin
 
 
 class CharDataset(Dataset):
@@ -39,6 +40,8 @@ class CharDataset(Dataset):
         y = torch.tensor(dix[1:], dtype=torch.long)
         return x, y
 
+
+# python benchmark.py --n_layer 4 --n_head 4 --n_embd 512 --gpus 2 --accelerator deepspeed --precision 16 --limit_train_batches 4
 
 if __name__ == '__main__':
     seed_everything(42)
@@ -79,8 +82,24 @@ if __name__ == '__main__':
 
     trainer = Trainer.from_argparse_args(
         args,
-        max_epochs=1,
+        max_epochs=2,
         gradient_clip_val=1.0,
+        plugins=[DeepSpeedPlugin(zero_optimization=True, stage=3)], # Pass in my own custom deepspeed plugin to turn off ZeRO-Offload
         callbacks=[lr_decay, CUDACallback()],
     )
     trainer.fit(model, train_loader)
+
+    trainer.test(test_dataloaders=train_loader)
+
+    trainer = Trainer.from_argparse_args(
+        args,
+        max_epochs=2,
+        gradient_clip_val=1.0,
+        plugins=[DeepSpeedPlugin(zero_optimization=True, stage=3)], # Pass in my own custom deepspeed plugin to turn off ZeRO-Offload
+        callbacks=[lr_decay, CUDACallback()],
+        resume_from_checkpoint="lightning_logs/version_0/checkpoints/epoch=1-step=7"
+    )
+    trainer.fit(model, train_loader)
+
+    trainer.test(test_dataloaders=train_loader)
+
