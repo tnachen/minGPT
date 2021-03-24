@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning import seed_everything
+from pytorch_lightning.plugins import FullyShardedPlugin
 from pytorch_lightning.utilities import rank_zero_info
 from torch.utils.data import Dataset, DataLoader
 
@@ -81,7 +82,7 @@ if __name__ == '__main__':
         args,
         max_epochs=1,
         gradient_clip_val=1.0,
-        plugins='ddp_fully_sharded',
+        plugins=FullyShardedPlugin(automatic_module_wrap=False),
         checkpoint_callback=False,
         callbacks=[lr_decay, CUDACallback()],
     )

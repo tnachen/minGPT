@@ -167,8 +167,6 @@ class GPT(pl.LightningModule):
     def configure_optimizers(self):
         # create the optimizer
         no_decay = ["bias", "LayerNorm.weight"]
-        # todo: when using FSDP, we flatten parameters which removes the original name.
-        # todo: this means that none of this logic really works...
         params_decay = [p for n, p in self.accelerator_model.named_parameters() if not any(nd in n for nd in no_decay)]
         params_nodecay = [p for n, p in self.accelerator_model.named_parameters() if any(nd in n for nd in no_decay)]
         optim_groups = [
@@ -186,7 +184,8 @@ class GPT(pl.LightningModule):
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
         position_embeddings = self.pos_emb[:, :t, :] # each position maps to a (learnable) vector
         x = self.drop(token_embeddings + position_embeddings)
-        x = self.blocks(x)
+        for block in self.blocks:
+            x = torch.utils.checkpoint.checkpoint(block, x)
         x = self.ln_f(x)
         logits = self.head(x)
         return logits
