@@ -156,7 +156,7 @@ class GPT(pl.LightningModule):
     def get_block_size(self):
         return self.block_size
 
-    def on_distributed_model_setup(self):
+    def on_model_parallel_setup(self) -> None:
         wrap_layer = 1
         blocks = []
         for x in range(self.config.n_layer):
