@@ -82,7 +82,7 @@ if __name__ == '__main__':
         args,
         max_epochs=1,
         gradient_clip_val=1.0,
-        plugins=FullyShardedPlugin(automatic_module_wrap=False),
+        plugins=FullyShardedPlugin(automatic_module_wrap=False, activation_checkpoint=True),
         checkpoint_callback=False,
         callbacks=[lr_decay, CUDACallback()],
     )
