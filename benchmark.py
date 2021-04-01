@@ -52,7 +52,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', default=6e-4, type=float)
     parser.add_argument('--block_size', default=128, type=int)
     parser.add_argument('--batch_size', default=8, type=int)
-    parser.add_argument('--num_workers', default=4, type=int)
+    parser.add_argument('--num_workers', default=0, type=int)
     args = parser.parse_args()
 
     if not os.path.exists("input.txt"):
@@ -82,7 +82,7 @@ if __name__ == '__main__':
         args,
         max_epochs=1,
         gradient_clip_val=1.0,
-        plugins=FullyShardedPlugin(automatic_module_wrap=False, activation_checkpoint=True),
+        plugins=FullyShardedPlugin(automatic_module_wrap=False),
         checkpoint_callback=False,
         callbacks=[lr_decay, CUDACallback()],
     )

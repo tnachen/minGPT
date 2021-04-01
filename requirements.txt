@@ -1,3 +1,3 @@
 https://github.com/PyTorchLightning/pytorch-lightning/archive/refs/heads/feat/fsdp.zip
-fairscale
+https://github.com/SeanNaren/fairscale/archive/refs/heads/disable_root_check.zip
 deepspeed

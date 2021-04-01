@@ -14,7 +14,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 from deepspeed.ops.adam import FusedAdam
-from fairscale.nn import auto_wrap, wrap
+from fairscale.nn import auto_wrap
 from torch.nn import functional as F
 
 logger = logging.getLogger(__name__)
@@ -157,10 +157,9 @@ class GPT(pl.LightningModule):
         return self.block_size
 
     def configure_sharded_model(self) -> None:
-        wrap_layer = 1
         blocks = []
         for x in range(self.config.n_layer):
-            layer = auto_wrap(Block(self.config)) if x % wrap_layer == 0 else Block(self.config)
+            layer = auto_wrap(Block(self.config), reshard_after_forward=True)
             blocks.append(layer)
         self.blocks = nn.Sequential(*blocks)
 
@@ -173,7 +172,7 @@ class GPT(pl.LightningModule):
             {"params": params_decay, "weight_decay": self.hparams.weight_decay},
             {"params": params_nodecay, "weight_decay": 0.0},
         ]
-        optimizer = FusedAdam(optim_groups, lr=self.hparams.learning_rate, betas=self.hparams.betas)
+        optimizer = FusedAdam(self.accelerator_model.parameters(), lr=self.hparams.learning_rate, betas=self.hparams.betas)
         return optimizer
 
     def forward(self, idx):
@@ -185,7 +184,7 @@ class GPT(pl.LightningModule):
         position_embeddings = self.pos_emb[:, :t, :] # each position maps to a (learnable) vector
         x = self.drop(token_embeddings + position_embeddings)
         for block in self.blocks:
-            x = torch.utils.checkpoint.checkpoint(block, x)
+            x = block(x)
         x = self.ln_f(x)
         logits = self.head(x)
         return logits
