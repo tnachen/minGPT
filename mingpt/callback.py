@@ -16,7 +16,7 @@ class CUDACallback(Callback):
     def on_batch_end(self, trainer, pl_module: LightningModule) -> None:
         torch.cuda.synchronize(trainer.root_gpu)
         max_memory = torch.cuda.max_memory_allocated(trainer.root_gpu) / 2 ** 20
-        pl_module.log('Peak Memory (MiB)', max_memory, on_step=True, sync_dist=True)
+        pl_module.log('peak_memory_MiB', max_memory, prog_bar=True, on_step=True, sync_dist=True)
 
     def on_train_epoch_end(self, trainer, pl_module, outputs):
         torch.cuda.synchronize(trainer.root_gpu)
