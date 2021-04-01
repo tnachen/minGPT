@@ -1,7 +1,7 @@
 import time
 
 import torch
-from pytorch_lightning import Callback
+from pytorch_lightning import Callback, LightningModule
 from pytorch_lightning.utilities import rank_zero_info
 
 
@@ -12,6 +12,11 @@ class CUDACallback(Callback):
         torch.cuda.reset_peak_memory_stats(trainer.root_gpu)
         torch.cuda.synchronize(trainer.root_gpu)
         self.start_time = time.time()
+
+    def on_batch_end(self, trainer, pl_module: LightningModule) -> None:
+        torch.cuda.synchronize(trainer.root_gpu)
+        max_memory = torch.cuda.max_memory_allocated(trainer.root_gpu) / 2 ** 20
+        pl_module.log('Peak Memory (MiB)', max_memory, on_step=True, sync_dist=True)
 
     def on_train_epoch_end(self, trainer, pl_module, outputs):
         torch.cuda.synchronize(trainer.root_gpu)
