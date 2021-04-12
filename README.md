@@ -1,12 +1,13 @@
-# minGPT Lightning
+# Lightning Multi-GPU Plugins Visualizations
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/seannaren/mingpt/streamlit/app.py)
 
-![mingpt](mingpt.jpg)
+This branch was used to record results for the Lightning Multi-GPU Plugins Visualizations.
 
-Modified [Andrej's](https://github.com/karpathy/minGPT) and [William's](https://github.com/williamFalcon/minGPT) awesome code to provide a benchmark script and show how to train a model from scratch at scale using Lightning.
+Raw results can be found in the `results/` folder.
 
-Currently implements Sharded and DeepSpeed training on two branches, with benchmarks for both individually.
+Due to supporting both FairScale & DeepSpeed checkpointing there is some boilerplate code logic. Recommended to use the below minimal implementations:
 
-- [minGPT DeepSpeed](https://github.com/SeanNaren/minGPT/tree/stage3)
+- [DeepSpeed](https://github.com/SeanNaren/minGPT/tree/stage3)
 - [Fully Sharded](https://github.com/SeanNaren/minGPT/tree/fully_sharded)
 
 ### License

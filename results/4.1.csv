@@ -1,0 +1,15 @@
+Plugin,Plugin Alias,Epoch Time (s),Time per iteration (s),Peak Memory (MiB),Virtual Memory (GiB),Time Taken to train (mins),Max Per GPU Batch Size,Batch Epoch Time (s)
+DeepSpeed ZeRO Stage 2,deepspeed_stage_2,47.8,0.35,24379.00,7.97,0.00,32,548.24
+DeepSpeed ZeRO Stage 2 w checkpointing,deepspeed_stage_2,53.12,0.39,20835.29,8.85,,360,110.7
+DeepSpeed ZeRO Stage 2 Offload,deepspeed_stage_2_offload,224.7,1.65,16989.13,37.45,,40,459.49
+DeepSpeed ZeRO Stage 2 Offload w checkpointing,deepspeed_stage_2_offload,231.16,1.70,13234.36,38.53,,512,123.59
+DeepSpeed ZeRO Stage 3,deepspeed_stage_3,111.27,0.82,13199.54,18.55,,48,136.07
+DeepSpeed ZeRO Stage 3 w checkpointing,deepspeed_stage_3,141.01,1.04,11353.50,23.50,,608,126.73
+DeepSpeed ZeRO Stage 3 Offload,deepspeed_stage_3_offload,489.32,3.60,6007.60,81.55,,64,284.14
+DeepSpeed ZeRO Stage 3 Offload w checkpointing,deepspeed_stage_3_offload,473.05,3.48,2252.69,78.84,,712,132.86
+Sharded Training,ddp_sharded,60.95,0.45,34620.00,10.16,,8,229.37
+Sharded Training w checkpointing,ddp_sharded,69.88,0.39,30190.57,8.74,,96,126.8
+Fully Sharded Training No Nested Wrapping,ddp_fully_sharded,601.28,4.42,29188.00,100.21,,24,1421.23
+Fully Sharded Training Wrap,ddp_fully_sharded,45.22,0.33,21769.74,7.54,,32,775.12
+Fully Sharded Training Auto Wrap,ddp_fully_sharded_auto_wrap,45.42,0.33,21769.70,7.57,,32,772.92
+Fully Sharded Training Auto Wrap w checkpointing,ddp_fully_sharded_auto_wrap,52.44,0.39,16059.01,8.74,,456,231.99

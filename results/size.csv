@@ -1,0 +1,8 @@
+Plugin,Plugin Alias,Parameters,Time per iteration (s),Epoch Time (s),CMD
+DDP,ddp,1.7,,33.60,python benchmark.py --n_layer 15 --n_head 16 --n_embd 3072 --gpus 8 --plugins ddp_find_unused_parameters_false --precision 16 --limit_train_batches 120 --checkpoint
+Sharded,ddp_sharded,4.9,,73.65,python benchmark.py --n_layer 43 --n_head 16 --n_embd 3072 --gpus 8 --plugins ddp_sharded --precision 16 --limit_train_batches 120 --checkpoint
+Fully Sharded Training,ddp_fully_sharded,16,,35033.11,python benchmark.py --n_layer 20 --n_head 16 --n_embd 8192 --gpus 8 --plugins ddp_fully_sharded --precision 16 --limit_train_batches 120 --checkpoint --wrap
+DeepSpeed ZeRO Stage 2,deepspeed_stage_2,7.4,,328.19,python benchmark.py --n_layer 65 --n_head 16 --n_embd 3072 --gpus 8 --plugins deepspeed_stage_2 --precision 16 --limit_train_batches 120 --checkpoint
+DeepSpeed ZeRO Stage 2 Offload,deepspeed_stage_2_offload,14.5,,1403.72,python benchmark.py --n_layer 18 --n_head 16 --n_embd 8192 --gpus 8 --plugins deepspeed_stage_2_offload --precision 16 --limit_train_batches 120 --checkpoint
+DeepSpeed ZeRO Stage 3,deepspeed_stage_3,13.69414861,,236.28,python size.py --n_layer 17 --n_head 16 --n_embd 8192 --gpus 8 --plugins deepspeed_stage_3 --precision 16 --limit_train_batches 120
+DeepSpeed ZeRO Stage 3 Offload,deepspeed_stage_3_offload,48.32690176,,3251.93,python benchmark.py --n_layer 60 --n_head 16 --n_embd 8192 --gpus 8 --precision 16 --plugins deepspeed_stage_3_offload  --limit_train_batches 120  --checkpoint

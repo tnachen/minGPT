@@ -1,0 +1,2 @@
+Plugin,Plugin Alias,Epoch Time (s),Time per iteration (s),Peak Memory (MiB),Virtual Memory (GiB),Time Taken to train (mins),Max Per GPU Batch Size,Batch Epoch Time (s)
+DeepSpeed ZeRO Stage 3 Offload w checkpointing,deepspeed_stage_3_offload,1501.49,11.04,18295.03,274.97,,288,559.39

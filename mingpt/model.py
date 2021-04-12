@@ -13,6 +13,11 @@ import logging
 import torch
 
 import torch.nn as nn
+from deepspeed import deepspeed
+from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
+from fairscale.nn import checkpoint_wrapper, auto_wrap, wrap
+from pytorch_lightning.plugins import DeepSpeedPlugin
+from pytorch_lightning.utilities import rank_zero_info
 from torch.nn import functional as F
 import pytorch_lightning as pl
 
@@ -28,14 +33,16 @@ class GPTConfig:
     def __init__(self, vocab_size, block_size, **kwargs):
         self.vocab_size = vocab_size
         self.block_size = block_size
-        for k,v in kwargs.items():
+        for k, v in kwargs.items():
             setattr(self, k, v)
+
 
 class GPT1Config(GPTConfig):
     """ GPT-1 like network roughly 125M params """
     n_layer = 12
     n_head = 12
     n_embd = 768
+
 
 class CausalSelfAttention(nn.Module):
     """
@@ -58,28 +65,29 @@ class CausalSelfAttention(nn.Module):
         self.proj = nn.Linear(config.n_embd, config.n_embd)
         # causal mask to ensure that attention is only applied to the left in the input sequence
         self.register_buffer("mask", torch.tril(torch.ones(config.block_size, config.block_size))
-                                     .view(1, 1, config.block_size, config.block_size))
+                             .view(1, 1, config.block_size, config.block_size))
         self.n_head = config.n_head
 
     def forward(self, x, layer_past=None):
         B, T, C = x.size()
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
-        k = self.key(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
-        q = self.query(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
-        v = self.value(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
+        k = self.key(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
+        q = self.query(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
+        v = self.value(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        att = att.masked_fill(self.mask[:,:,:T,:T] == 0, float('-inf'))
+        att = att.masked_fill(self.mask[:, :, :T, :T] == 0, float('-inf'))
         att = F.softmax(att, dim=-1)
         att = self.attn_drop(att)
-        y = att @ v # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
-        y = y.transpose(1, 2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
+        y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
+        y = y.transpose(1, 2).contiguous().view(B, T, C)  # re-assemble all head outputs side by side
 
         # output projection
         y = self.resid_drop(self.proj(y))
         return y
+
 
 class Block(nn.Module):
     """ an unassuming Transformer block """
@@ -104,6 +112,7 @@ class Block(nn.Module):
 
 class GPT(pl.LightningModule):
     """  the full GPT language model, with a context size of block_size """
+
     def __init__(self,
                  vocab_size,
                  weight_decay=0.1,
@@ -115,7 +124,10 @@ class GPT(pl.LightningModule):
                  n_layer=12,
                  n_head=4,
                  resid_pdrop=0.1,
-                 attn_pdrop=0.1
+                 attn_pdrop=0.1,
+                 checkpoint=False,
+                 should_auto_wrap=False,
+                 should_wrap=False
                  ):
         super().__init__()
         # auto creates self.hparams from the method signature
@@ -128,8 +140,7 @@ class GPT(pl.LightningModule):
         self.tok_emb = nn.Embedding(vocab_size, n_embd)
         self.pos_emb = nn.Parameter(torch.zeros(1, block_size, n_embd))
         self.drop = nn.Dropout(embd_pdrop)
-        # transformer
-        self.blocks = nn.Sequential(*[Block(self.config) for _ in range(self.config.n_layer)])
+
         # decoder head
         self.ln_f = nn.LayerNorm(self.config.n_embd)
         self.head = nn.Linear(self.config.n_embd, self.config.vocab_size, bias=False)
@@ -151,27 +162,53 @@ class GPT(pl.LightningModule):
     def get_block_size(self):
         return self.block_size
 
+    def configure_sharded_model(self) -> None:
+        blocks = []
+        for x in range(self.config.n_layer):
+            layer = Block(self.config)
+            if self.hparams.checkpoint and not self.use_deepspeed:
+                layer = checkpoint_wrapper(layer)
+            if self.hparams.should_auto_wrap:
+                layer = auto_wrap(layer, reshard_after_forward=True)
+            elif self.hparams.should_wrap:
+                layer = wrap(layer, reshard_after_forward=True)
+            blocks.append(layer)
+        if self.hparams.should_wrap or self.hparams.should_auto_wrap:
+            self.blocks = wrap(nn.Sequential(*blocks))
+        else:
+            self.blocks = nn.Sequential(*blocks)
+
     def configure_optimizers(self):
+        rank_zero_info(self.trainer.model)
         # create the optimizer
-        no_decay = ["bias", "LayerNorm.weight"]
-        params_decay = [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)]
-        params_nodecay = [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)]
-        optim_groups = [
-            {"params": params_decay, "weight_decay": self.hparams.weight_decay},
-            {"params": params_nodecay, "weight_decay": 0.0},
-        ]
-        optimizer = torch.optim.AdamW(optim_groups, lr=self.hparams.learning_rate, betas=self.hparams.betas)
-        return optimizer
+        if self.use_deepspeed and self.cpu_offload:
+            return DeepSpeedCPUAdam(
+                self.trainer.model.parameters(),
+                lr=self.hparams.learning_rate,
+                betas=self.hparams.betas
+            )
+        return FusedAdam(
+            self.trainer.model.parameters(),
+            lr=self.hparams.learning_rate,
+            betas=self.hparams.betas
+        )
 
     def forward(self, idx):
         b, t = idx.size()
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
         # forward the GPT model
-        token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
-        position_embeddings = self.pos_emb[:, :t, :] # each position maps to a (learnable) vector
+        token_embeddings = self.tok_emb(idx)  # each index maps to a (learnable) vector
+        position_embeddings = self.pos_emb[:, :t, :]  # each position maps to a (learnable) vector
         x = self.drop(token_embeddings + position_embeddings)
-        x = self.blocks(x)
+        if self.hparams.should_wrap or self.hparams.should_auto_wrap:
+            x = self.blocks(x)
+        else:
+            for block in self.blocks:
+                if self.hparams.checkpoint and self.use_deepspeed:
+                    x = deepspeed.checkpointing.checkpoint(block, x)
+                else:
+                    x = block(x)
         x = self.ln_f(x)
         logits = self.head(x)
         return logits
@@ -181,6 +218,10 @@ class GPT(pl.LightningModule):
         # same action as inference
         logits = self(idx)
 
+        if not hasattr(self, 'done'):
+            rank_zero_info(self.trainer.model)
+            self.done = True
+
         # if we are given some desired targets also calculate the loss
         loss = None
         if targets is not None:
@@ -189,3 +230,12 @@ class GPT(pl.LightningModule):
         self.log('train_loss', loss)
         return loss
 
+    @property
+    def use_deepspeed(self):
+        return isinstance(self.trainer.accelerator.training_type_plugin, DeepSpeedPlugin)
+
+    @property
+    def cpu_offload(self):
+        return self.use_deepspeed and (self.trainer.accelerator.training_type_plugin.config['zero_optimization'].get(
+            'offload_optimizer') or self.trainer.accelerator.training_type_plugin.config['zero_optimization'].get(
+            'offload_param'))
