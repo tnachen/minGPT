@@ -339,7 +339,9 @@ trainer.fit(model)
 )
 
 st.markdown(
-    "See [the benchmark code](https://github.com/SeanNaren/minGPT/tree/streamlit)."
+    "From this data, high level conclusions and guides can be found in the "
+    "[Advanced GPU Optimized Training documentation](https://pytorch-lightning.readthedocs.io/en/latest/advanced/advanced_gpu.html).\n\n"
+    "In addition, see [the benchmark code](https://github.com/SeanNaren/minGPT/tree/streamlit)."
 )
 
 plot_model_size_vs_metric_figure(
