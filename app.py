@@ -353,7 +353,7 @@ plot_model_size_vs_metric_figure(
                 "As peak GPU Memory is reduced we can increase batch size, "
                 "which is captured separately in the Model Parameters vs Max Per GPU Batch Size graph.",
     y_axis='Peak Memory (MiB)',
-    y_axis_title='Average Per GPU Peak Memory (MiB)',
+    y_axis_title='Average Per GPU Peak Memory (GiB)',
     scale_y=1024
 )
 
