@@ -20,6 +20,7 @@ def select_color():
     return color
 
 
+num_iters = 44320  # Number of samples in full shakespeare
 num_entries = 20
 cmap = plt.cm.get_cmap('plasma', num_entries)
 color_index = 0
@@ -27,6 +28,7 @@ color_index = 0
 
 def create_model_size_vs_metric_figure(y_axis,
                                        y_axis_title,
+                                       norm_y=None,
                                        scale_y=1,
                                        checkpointing=False):
     names = [250000000, 500000000, 1000000000, 4000000000]
@@ -52,7 +54,10 @@ def create_model_size_vs_metric_figure(y_axis,
         for name, df in zip(names, data_frames):
             if (df['Plugin'] == plugin).any():
                 x.append(name)
-                y.append(df[df['Plugin'] == plugin][y_axis].item() / scale_y)
+                val = df[df['Plugin'] == plugin][y_axis].item() / scale_y
+                if norm_y:
+                    val = norm_y / val
+                y.append(val)
         fig.add_trace(
             go.Scatter(
                 x=x,
@@ -89,7 +94,7 @@ def create_model_size_vs_metric_figure(y_axis,
     return fig
 
 
-def plot_model_size_vs_metric_figure(title, y_axis, scale_y, description, y_axis_title=None):
+def plot_model_size_vs_metric_figure(title, y_axis, scale_y, description, norm_y=None, y_axis_title=None):
     st.subheader(title)
     st.text(description)
     checkpointing = st.checkbox(
@@ -109,20 +114,22 @@ def plot_model_size_vs_metric_figure(title, y_axis, scale_y, description, y_axis
             y_axis=y_axis,
             y_axis_title=y_axis_title,
             scale_y=scale_y,
+            norm_y=norm_y,
             checkpointing=checkpointing
         ),
         use_container_width=True
     )
 
 
-def create_model_size_specific_figure(path,
-                                      x='Time per iteration (s)',
-                                      y='Peak Memory (MiB)',
-                                      scale_y=1024,
-                                      x_axis_title=None,
-                                      y_axis_title=None,
-                                      baseline=None,
-                                      display_plugin_text=('DDP',)):
+def create_model_size_specific_figure(
+        path,
+        x='Time per iteration (s)',
+        y='Peak Memory (MiB)',
+        scale_y=1024,
+        x_axis_title=None,
+        y_axis_title=None,
+        baseline=None,
+        display_plugin_text=('DDP',)):
     df = pd.read_csv(path)
 
     if baseline:
@@ -366,12 +373,14 @@ plot_model_size_vs_metric_figure(
 )
 
 plot_model_size_vs_metric_figure(
-    title="Model Parameters vs Epoch Time (s)",
-    description="We use the largest batch size for these timings as described in the above graph."
-                " Note that this means convergence may be affected, "
+    title="Model Parameters vs Throughput (samples per second)",
+    description="We use the largest batch size that we could fit per plugin for these timings, "
+                "measured in the above graph.\nNote that this means convergence may be affected, "
                 "and in the future we will provide time to convergence graphs.",
     y_axis='Batch Epoch Time (s)',
-    scale_y=1
+    y_axis_title='Throughput: Samples per second',
+    scale_y=1,
+    norm_y=num_iters
 )
 st.header("Per Model Size Breakdown")
 
