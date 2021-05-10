@@ -354,7 +354,8 @@ st.markdown(
 plot_model_size_vs_metric_figure(
     title="Model Parameters vs Peak Memory (GiB)",
     description="Batch size has been fixed to 8. "
-                "In general, lower peak memory means less memory required per GPU, "
+                " Useful for determining model size for your hardware limits.\n"
+                "In general lower peak memory means less memory required per GPU, "
                 "however note in some cases a trade off with speed is required, "
                 "which is captured in other below graphs.\n\n"
                 "As peak GPU Memory is reduced we can increase batch size, "
@@ -366,7 +367,8 @@ plot_model_size_vs_metric_figure(
 
 plot_model_size_vs_metric_figure(
     title="Model Parameters vs Max Per GPU Batch Size",
-    description="Largest batch size per GPU that can fit onto 8 A100 GPUs at multiples of 8. "
+    description="Largest batch size per GPU that can fit onto 8 A100 GPUs at multiples of 8, "
+                "useful for training regimes that require larger batch sizes (SSL). "
                 "This required manual tuning of the batch size so there may be small discrepancies.",
     y_axis='Max Per GPU Batch Size',
     scale_y=1
@@ -385,7 +387,7 @@ plot_model_size_vs_metric_figure(
 st.header("Per Model Size Breakdown")
 
 st.text(
-    "Useful for drilling further into the data if you have a model of particular parameter size you'd like to train.")
+    "Useful for drilling further into the data if you have a particular model size you'd like to train.")
 
 model_size_plots = {
     "250M Parameters": dict(input_path='results/250m.csv'),
