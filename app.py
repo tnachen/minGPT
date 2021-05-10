@@ -330,7 +330,7 @@ st.markdown(
 )
 st.markdown(
     "These results were collected using an [8 A100 GPU machine](https://lambdalabs.com/deep-learning/servers/hyperplane-a100).\n"
-    "All plugins are available as a string argument to the PyTorch Lightning Trainer via ``plugins=x``."
+    "Plugins are available as a string argument to the PyTorch Lightning Trainer via ``plugins=x``.\n"
 )
 
 st.code(
@@ -348,6 +348,7 @@ trainer.fit(model)
 st.markdown(
     "From this data, high level conclusions and guides can be found in the "
     "[Advanced GPU Optimized Training documentation](https://pytorch-lightning.readthedocs.io/en/latest/advanced/advanced_gpu.html).\n\n"
+    "Fully Sharded is still in development, and can be installed from [this](https://github.com/PyTorchLightning/pytorch-lightning/tree/feat/fsdp) branch.\n\n"
     "In addition, see [the benchmark code](https://github.com/SeanNaren/minGPT/tree/streamlit)."
 )
 
@@ -377,7 +378,8 @@ plot_model_size_vs_metric_figure(
 plot_model_size_vs_metric_figure(
     title="Model Parameters vs Throughput (samples per second)",
     description="We use the largest batch size that we could fit per plugin for these timings, "
-                "measured in the above graph.\nNote that this means convergence may be affected, "
+                "measured in the above graph. Each sample is a block of 128 tokens.\n"
+                "Note that this means convergence may be affected, "
                 "and in the future we will provide time to convergence graphs.",
     y_axis='Batch Epoch Time (s)',
     y_axis_title='Throughput: Samples per second',
