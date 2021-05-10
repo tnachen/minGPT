@@ -6,7 +6,7 @@ Modified [Andrej's](https://github.com/karpathy/minGPT) and [William's](https://
 
 Currently implements Sharded and DeepSpeed training on two branches, with benchmarks for both individually.
 
-- [minGPT DeepSpeed](https://github.com/SeanNaren/minGPT/tree/stage3)
+- [DeepSpeed](https://github.com/SeanNaren/minGPT/tree/stage3)
 - [Fully Sharded](https://github.com/SeanNaren/minGPT/tree/fully_sharded)
 
 ### License
