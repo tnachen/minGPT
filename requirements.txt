@@ -1,2 +1,2 @@
-git+https://github.com/PyTorchLightning/pytorch-lightning.git#c63abd8a7e7b66678c447c9efd8e915dc4b77821
+git+https://github.com/PyTorchLightning/pytorch-lightning.git@sean_debug
 deepspeed
