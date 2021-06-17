@@ -1,2 +1,2 @@
-https://github.com/PyTorchLightning/pytorch-lightning/archive/refs/heads/sean_debug.zip
+https://github.com/PyTorchLightning/pytorch-lightning/archive/refs/heads/sean_debug_2.zip
 deepspeed
