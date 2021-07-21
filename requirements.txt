@@ -2,5 +2,5 @@ streamlit
 plotly
 matplotlib
 pytorch-lightning==1.4.0rc0
-deepspeed
+deepspeed==0.4.1
 fairscale
