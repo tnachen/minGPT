@@ -187,7 +187,7 @@ class GPT(pl.LightningModule):
                 lr=self.hparams.learning_rate,
                 betas=self.hparams.betas
             )
-        return torch.optim.AdamW(
+        return FusedAdam(
             self.trainer.model.parameters(),
             lr=self.hparams.learning_rate,
             betas=self.hparams.betas
