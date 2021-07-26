@@ -20,6 +20,7 @@ from pytorch_lightning.plugins import DeepSpeedPlugin
 from pytorch_lightning.utilities import rank_zero_info
 from torch.nn import functional as F
 import pytorch_lightning as pl
+from torch_ort import ORTModule
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,42 @@ class Block(nn.Module):
         return x
 
 
+class Model(torch.nn.Module):
+    def __init__(self, vocab_size, n_embd, block_size, embd_pdrop, n_layer, config):
+        # input embedding stem
+        super().__init__()
+        self.tok_emb = nn.Embedding(vocab_size, n_embd)
+        self.pos_emb = nn.Parameter(torch.zeros(1, block_size, n_embd))
+        self.drop = nn.Dropout(embd_pdrop)
+        self.config = config
+
+        # decoder head
+        self.ln_f = nn.LayerNorm(n_embd)
+        self.head = nn.Linear(n_embd, vocab_size, bias=False)
+
+        self.block_size = block_size
+
+        blocks = []
+        for x in range(n_layer):
+            layer = Block(self.config)
+            blocks.append(layer)
+        self.blocks = nn.Sequential(*blocks)
+
+    def forward(self, idx):
+        b, t = idx.size()
+        assert t <= self.block_size, "Cannot forward, model block size is exhausted."
+
+        # forward the GPT model
+        token_embeddings = self.tok_emb(idx)  # each index maps to a (learnable) vector
+        position_embeddings = self.pos_emb[:, :t, :]  # each position maps to a (learnable) vector
+        x = self.drop(token_embeddings + position_embeddings)
+        x = self.blocks(x)
+        x = self.ln_f(x)
+        logits = self.head(x)
+        return logits
+
+
+
 class GPT(pl.LightningModule):
     """  the full GPT language model, with a context size of block_size """
 
@@ -127,7 +164,8 @@ class GPT(pl.LightningModule):
                  attn_pdrop=0.1,
                  checkpoint=False,
                  should_auto_wrap=False,
-                 should_wrap=False
+                 should_wrap=False,
+                 ort=False
                  ):
         super().__init__()
         # auto creates self.hparams from the method signature
@@ -137,13 +175,9 @@ class GPT(pl.LightningModule):
         self.config = self.hparams
 
         # input embedding stem
-        self.tok_emb = nn.Embedding(vocab_size, n_embd)
-        self.pos_emb = nn.Parameter(torch.zeros(1, block_size, n_embd))
-        self.drop = nn.Dropout(embd_pdrop)
-
-        # decoder head
-        self.ln_f = nn.LayerNorm(self.config.n_embd)
-        self.head = nn.Linear(self.config.n_embd, self.config.vocab_size, bias=False)
+        self.model = Model(vocab_size, n_embd, block_size, embd_pdrop, n_layer, self.config)
+        if ort:
+            self.model = ORTModule(self.model)
 
         self.block_size = self.config.block_size
         self.apply(self._init_weights)
@@ -162,22 +196,6 @@ class GPT(pl.LightningModule):
     def get_block_size(self):
         return self.block_size
 
-    def configure_sharded_model(self) -> None:
-        blocks = []
-        for x in range(self.config.n_layer):
-            layer = Block(self.config)
-            if self.hparams.checkpoint and not self.use_deepspeed:
-                layer = checkpoint_wrapper(layer)
-            if self.hparams.should_auto_wrap:
-                layer = auto_wrap(layer, reshard_after_forward=True)
-            elif self.hparams.should_wrap:
-                layer = wrap(layer, reshard_after_forward=True)
-            blocks.append(layer)
-        if self.hparams.should_wrap or self.hparams.should_auto_wrap:
-            self.blocks = wrap(nn.Sequential(*blocks))
-        else:
-            self.blocks = nn.Sequential(*blocks)
-
     def configure_optimizers(self):
         rank_zero_info(self.trainer.model)
         # create the optimizer
@@ -194,33 +212,12 @@ class GPT(pl.LightningModule):
         )
 
     def forward(self, idx):
-        b, t = idx.size()
-        assert t <= self.block_size, "Cannot forward, model block size is exhausted."
-
-        # forward the GPT model
-        token_embeddings = self.tok_emb(idx)  # each index maps to a (learnable) vector
-        position_embeddings = self.pos_emb[:, :t, :]  # each position maps to a (learnable) vector
-        x = self.drop(token_embeddings + position_embeddings)
-        if self.hparams.should_wrap or self.hparams.should_auto_wrap:
-            x = self.blocks(x)
-        else:
-            for block in self.blocks:
-                if self.hparams.checkpoint and self.use_deepspeed:
-                    x = deepspeed.checkpointing.checkpoint(block, x)
-                else:
-                    x = block(x)
-        x = self.ln_f(x)
-        logits = self.head(x)
-        return logits
+        return self.model(idx)
 
     def training_step(self, batch, batch_idx):
         idx, targets = batch
         # same action as inference
         logits = self(idx)
-
-        if not hasattr(self, 'done'):
-            rank_zero_info(self.trainer.model)
-            self.done = True
 
         # if we are given some desired targets also calculate the loss
         loss = None

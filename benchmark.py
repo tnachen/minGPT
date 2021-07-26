@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning import seed_everything
+from pytorch_lightning.plugins import DeepSpeedPlugin
 from pytorch_lightning.utilities import rank_zero_info
 from torch.utils.data import Dataset, DataLoader
 
@@ -56,6 +57,7 @@ if __name__ == '__main__':
     parser.add_argument('--auto_wrap', action='store_true', default=False)
     parser.add_argument('--wrap', action='store_true', default=False)
     parser.add_argument('--full_shakespeare', action='store_true', default=False)
+    parser.add_argument('--ort', action='store_true', default=False)
     args = parser.parse_args()
 
     if args.full_shakespeare and not os.path.exists("shakespeare_input.txt"):
@@ -77,7 +79,8 @@ if __name__ == '__main__':
         learning_rate=args.learning_rate,
         checkpoint=args.checkpoint,
         should_auto_wrap=args.auto_wrap,
-        should_wrap=args.wrap
+        should_wrap=args.wrap,
+        ort=args.ort
     )
 
     lr_decay = LearningRateDecayCallback(
@@ -87,7 +90,8 @@ if __name__ == '__main__':
     )
     trainer = Trainer.from_argparse_args(
         args,
-        plugins=args.plugins,
+        # plugins=args.plugins,
+        plugins=DeepSpeedPlugin(stage=1),
         log_every_n_steps=1,
         max_epochs=1,
         gradient_clip_val=1.0,
