@@ -1,2 +1,5 @@
-git+https://github.com/PyTorchLightning/pytorch-lightning.git
-deepspeed
+git+https://github.com/PyTorchLightning/pytorch-lightning.git@deepspeed_fix
+deepspeed==0.4.3
+numpy==1.21.1
+psutil==5.8.0
+torch==1.9.0+cu111
