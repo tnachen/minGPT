@@ -1,4 +1,4 @@
-git+https://github.com/PyTorchLightning/pytorch-lightning.git@deepspeed_fix
+git+https://github.com/PyTorchLightning/pytorch-lightning.git@deepsource-fix-126a7a0a
 deepspeed
 numpy
 psutil
